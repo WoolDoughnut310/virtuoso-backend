@@ -4,13 +4,14 @@ from psycopg_pool import AsyncConnectionPool
 from fastapi import Depends
 from .models.user import UserInDB
 from psycopg.rows import dict_row, DictRow
+from .config import settings
 
 pool: AsyncConnectionPool | None = None
 
 async def init_pool():
     global pool
     pool = AsyncConnectionPool(
-        "postgresql://user:pass@localhost/db",
+        f"postgresql://{settings.db_user}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}",
         min_size=1,
         max_size=10,
     )
