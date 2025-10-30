@@ -1,20 +1,22 @@
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
-import jwt
 from fastapi import Depends, APIRouter, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pwdlib import PasswordHash
 from .config import settings
-from .db import get_user, CursorDep
 from .models.token import Token
+from .database import SessionDep
+from .models.user import User
+from sqlmodel import select
+import jwt
 
 
 password_hash = PasswordHash.recommended()
 
 router = APIRouter()
 
-async def authenticate(username: str, password: str, cur: CursorDep):
-    user = await get_user(username, cur)
+def authenticate(username: str, password: str, session: SessionDep):
+    user = session.exec(select(User).where(User.username == username)).first()
     if not user:
         return False
     if not password_hash.verify(password, user.hashed_password):
@@ -24,9 +26,9 @@ async def authenticate(username: str, password: str, cur: CursorDep):
 @router.post("/token")
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    cur: CursorDep
+    session: SessionDep
 ) -> Token:
-    user = await authenticate(form_data.username, form_data.password, cur)
+    user = authenticate(form_data.username, form_data.password, session)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

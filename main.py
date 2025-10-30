@@ -1,16 +1,15 @@
 from fastapi import FastAPI
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from .db import init_pool, close_pool
-from .routers import ws
-from .routers import users
+from .database import create_db_and_tables
+from . import models
+from .routers import ws, users
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_pool()
-    yield
-    await close_pool()
+    create_db_and_tables()
+    yield    
 
 app = FastAPI()
 
