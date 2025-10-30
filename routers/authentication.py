@@ -3,10 +3,10 @@ from typing import Annotated
 from fastapi import Depends, APIRouter, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pwdlib import PasswordHash
-from .config import settings
-from .models.token import Token
-from .database import SessionDep
-from .models.user import User
+from config import settings
+from models.token import Token
+from database import SessionDep
+from models.user import User
 from sqlmodel import select
 import jwt
 
