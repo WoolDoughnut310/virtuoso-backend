@@ -7,9 +7,3 @@ class AudioManager:
         self.player = MediaPlayer(file_path)
         if self.player.audio:
             self.track = self.relay.subscribe(self.player.audio)
-
-    async def loop_if_ended(self):
-        if self.player.audio and self.player.audio.readyState == "ended":
-            self.player = MediaPlayer(self.file_path)
-            if self.player.audio:
-                self.track = self.relay.subscribe(self.player.audio)

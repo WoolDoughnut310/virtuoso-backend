@@ -7,9 +7,7 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(audio_manager.loop_if_ended())
     yield
-    task.cancel()
     await asyncio.gather(*[pc.close() for pc in pcs], return_exceptions=True)
 
 
