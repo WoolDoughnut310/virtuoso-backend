@@ -8,6 +8,9 @@ from models.user import User
 from sqlmodel import select
 import jwt
 
+def get_media_path():
+    return "media"
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], session: SessionDep):
