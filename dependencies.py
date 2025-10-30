@@ -2,9 +2,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from typing import Annotated
-from .config import settings
-from .database import SessionDep
-from .models.user import User
+from config import settings
+from database import SessionDep
+from models.user import User
 from sqlmodel import select
 import jwt
 

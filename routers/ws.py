@@ -2,7 +2,7 @@ from fastapi import FastAPI, APIRouter, WebSocket
 from aiortc import RTCPeerConnection, RTCSessionDescription
 import asyncio, json
 from aiortc.sdp import candidate_from_sdp
-from ..audio_manager import AudioManager
+from audio_manager import AudioManager
 from contextlib import asynccontextmanager
 
 @asynccontextmanager

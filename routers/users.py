@@ -1,9 +1,9 @@
 from typing import Annotated
 from fastapi import Depends, APIRouter
-from ..models.user import User, UserPublic, UserCreate
-from ..dependencies import get_current_user
-from ..database import SessionDep
-from ..auth import password_hash
+from models.user import User, UserPublic, UserCreate
+from dependencies import get_current_user
+from database import SessionDep
+from routers.authentication import password_hash
 
 router = APIRouter()
 
@@ -14,7 +14,7 @@ async def read_users_me(
 ):
     return current_user
 
-@router.get("/register", response_model=UserPublic)
+@router.post("/register", response_model=UserPublic)
 async def register_user(
     user: UserCreate,
     session: SessionDep
@@ -27,4 +27,4 @@ async def register_user(
     session.commit()
     session.refresh(user_db)
 
-    return user
+    return user_db
