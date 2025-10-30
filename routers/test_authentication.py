@@ -1,19 +1,6 @@
-from pwdlib import PasswordHash
-from models.user import User
-
-password_hash = PasswordHash.recommended()
-
-def test_login_success(client, session):
+def test_login_success(client, make_test_user):
     password = "securepassword"
-    user = User(
-        username="testuser",
-        email="testuser@accounts.com",
-        full_name="Test User",
-        hashed_password=password_hash.hash(password)
-    )
-    session.add(user)
-    session.commit()
-    session.refresh(user)
+    user = make_test_user(password)
 
     response = client.post("/token", data={
         "username": user.username,
