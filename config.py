@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     db_user: str = "user"
-    db_password: str = "password"
+    db_pass: str = "password"
     db_host: str = "localhost"
     db_name: str = "mydb"
     db_port: int = 5432
