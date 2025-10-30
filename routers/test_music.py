@@ -1,4 +1,3 @@
-from fastapi.testclient import TestClient
 from io import BytesIO
 from dependencies import get_media_path
 from main import app
