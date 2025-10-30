@@ -13,3 +13,8 @@ def client():
 def session():
     with Session(engine) as session:
         yield session
+
+@pytest.fixture
+def websocket(client):
+    with client.websocket_connect("/ws") as ws:
+        yield ws
