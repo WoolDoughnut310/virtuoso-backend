@@ -4,8 +4,10 @@ class UserBase(SQLModel):
     username: str = Field(index=True)
     email: str | None = None
     full_name: str | None = None
+    is_artist: bool = Field(default=False)
 
 class User(UserBase, table=True):
+    __tablename__ = "users" # type: ignore
     id: int | None = Field(default=None, primary_key=True)
     hashed_password: str
 
