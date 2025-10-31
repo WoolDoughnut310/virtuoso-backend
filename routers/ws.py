@@ -2,16 +2,20 @@ from fastapi import FastAPI, APIRouter, WebSocket
 from aiortc import RTCPeerConnection, RTCSessionDescription
 import asyncio, json
 from aiortc.sdp import candidate_from_sdp
-from audio_manager import AudioManager
+from concert_manager import ConcertManager
 from contextlib import asynccontextmanager
+
+concert_manager = ConcertManager()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    concert_manager.start() # Remove later
     yield
     await asyncio.gather(*[pc.close() for pc in pcs], return_exceptions=True)
+    concert_manager.stop()
 
 
-audio_manager = AudioManager("Huntrix - Golden.mp3")
 pcs = set()
 
 router = APIRouter(lifespan=lifespan)
@@ -22,7 +26,7 @@ async def websocket_endpoint(ws: WebSocket):
     pc = RTCPeerConnection()
     pcs.add(pc)
 
-    pc.addTrack(audio_manager.track)
+    pc.addTrack(concert_manager.create_track())
 
     @pc.on("icecandidate")
     async def on_icecandidate(candidate):
