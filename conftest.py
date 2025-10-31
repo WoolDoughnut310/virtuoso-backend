@@ -45,5 +45,5 @@ def make_test_user(session):
 def media_path(tmp_path):
     media_dir = tmp_path / "media"
     media_dir.mkdir()
-    app.dependency_overrides[get_media_path] = lambda: str(media_dir)
+    app.dependency_overrides[get_media_path] = lambda: media_dir
     return media_dir

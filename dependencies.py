@@ -6,10 +6,13 @@ from config import settings
 from database import SessionDep
 from models.user import User
 from sqlmodel import select
+from pathlib import Path
 import jwt
 
 def get_media_path():
-    return "media"
+    return Path("media")
+
+MediaPathDep = Annotated[Path, Depends(get_media_path)]
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
