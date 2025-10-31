@@ -31,7 +31,8 @@ def make_test_user(session):
             username="testuser",
             email="testuser@accounts.com",
             full_name="Test User",
-            hashed_password=password_hash.hash(password)
+            hashed_password=password_hash.hash(password),
+            is_artist=is_artist
         )
         session.add(user)
         session.commit()
