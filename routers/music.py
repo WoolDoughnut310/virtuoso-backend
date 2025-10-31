@@ -1,13 +1,13 @@
 from fastapi import APIRouter, UploadFile, Depends
 import os
 from uuid import uuid4
-from dependencies import get_media_path, check_artist
+from dependencies import MediaPathDep, check_artist
 
 router = APIRouter()
 
 @router.post("/upload", dependencies=[Depends(check_artist)])
-async def upload_file(file: UploadFile, media_path: str = Depends(get_media_path)):
-    os.makedirs(media_path, exist_ok=True)
+async def upload_file(file: UploadFile, media_path: MediaPathDep):
+    media_path.mkdir(exist_ok=True)
     filename = f"{uuid4().hex}.bin"
     file_path = os.path.join(media_path, filename)
 
