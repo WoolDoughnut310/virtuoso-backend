@@ -1,11 +1,13 @@
 from fastapi import APIRouter, UploadFile, Depends
 import os
 from uuid import uuid4
-from dependencies import MediaPathDep, check_artist
+from dependencies.media import MediaPathDep
+from dependencies.artists import check_artist
+from dependencies.concerts import ConcertManagerDep
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(check_artist)])
 
-@router.post("/upload", dependencies=[Depends(check_artist)])
+@router.post("/upload")
 async def upload_file(file: UploadFile, media_path: MediaPathDep):
     media_path.mkdir(exist_ok=True)
     filename = f"{uuid4().hex}.bin"
@@ -16,3 +18,8 @@ async def upload_file(file: UploadFile, media_path: MediaPathDep):
             out_file.write(chunk)
 
     return {"filename": filename, "ok": True}
+
+@router.post("/start")
+async def start_concert(concert_manager: ConcertManagerDep):
+
+    return {"ok": True}

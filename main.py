@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from database import create_db_and_tables
 import models
-from routers import ws, users, authentication, music
+from routers import concerts, ws, users, authentication
 
 
 @asynccontextmanager
@@ -15,4 +15,4 @@ app = FastAPI()
 app.include_router(ws.router)
 app.include_router(users.router)
 app.include_router(authentication.router)
-app.include_router(music.router)
+app.include_router(concerts.router)

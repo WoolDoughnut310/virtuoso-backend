@@ -10,7 +10,6 @@ concert_manager = ConcertManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    concert_manager.start() # Remove later
     yield
     await asyncio.gather(*[pc.close() for pc in pcs], return_exceptions=True)
     concert_manager.stop()

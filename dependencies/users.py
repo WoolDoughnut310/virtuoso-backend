@@ -6,13 +6,7 @@ from config import settings
 from dependencies.db import SessionDep
 from models.user import User
 from sqlmodel import select
-from pathlib import Path
 import jwt
-
-def get_media_path():
-    return Path("media")
-
-MediaPathDep = Annotated[Path, Depends(get_media_path)]
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -38,9 +32,3 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], session: Ses
     return user
 
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
-
-def check_artist(user: CurrentUserDep):
-    print("user", user)
-    if not user.is_artist:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-    return True

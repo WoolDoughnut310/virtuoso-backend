@@ -1,6 +1,6 @@
 from aiortc.contrib.media import MediaPlayer, MediaRelay
 from aiortc import MediaStreamTrack, MediaStreamError
-from dependencies import get_media_path
+from dependencies.media import get_media_path
 import asyncio
 
 class ConcertTrack(MediaStreamTrack):

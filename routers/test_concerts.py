@@ -1,6 +1,6 @@
 from io import BytesIO
 from main import app
-from dependencies import get_current_user
+from dependencies.users import get_current_user
 import pytest
 
 @pytest.fixture
