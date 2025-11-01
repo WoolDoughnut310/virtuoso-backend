@@ -2,17 +2,15 @@ from fastapi import FastAPI, APIRouter, WebSocket
 from aiortc import RTCPeerConnection, RTCSessionDescription
 import asyncio, json
 from aiortc.sdp import candidate_from_sdp
-from concert_manager import ConcertManager
+from dependencies.concerts import get_concert_manager, ConcertManagerDep
 from contextlib import asynccontextmanager
-
-concert_manager = ConcertManager()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
     await asyncio.gather(*[pc.close() for pc in pcs], return_exceptions=True)
-    concert_manager.stop()
+    get_concert_manager().stop()
 
 
 pcs = set()
@@ -20,7 +18,7 @@ pcs = set()
 router = APIRouter(lifespan=lifespan)
 
 @router.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
+async def websocket_endpoint(ws: WebSocket, concert_manager: ConcertManagerDep):
     await ws.accept()
     pc = RTCPeerConnection()
     pcs.add(pc)

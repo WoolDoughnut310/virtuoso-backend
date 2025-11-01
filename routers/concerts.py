@@ -21,5 +21,5 @@ async def upload_file(file: UploadFile, media_path: MediaPathDep):
 
 @router.post("/start")
 async def start_concert(concert_manager: ConcertManagerDep):
-
+    concert_manager.start()
     return {"ok": True}
