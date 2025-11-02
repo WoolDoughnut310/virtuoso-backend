@@ -2,7 +2,7 @@ from fastapi import FastAPI, APIRouter, WebSocket
 from aiortc import RTCPeerConnection, RTCSessionDescription
 import asyncio, json
 from aiortc.sdp import candidate_from_sdp
-from app.dependencies.concerts import get_concert_manager, ConcertManagerDep
+from app.dependencies.concerts import ConcertManagerDep
 from contextlib import asynccontextmanager
 
 
@@ -10,7 +10,6 @@ from contextlib import asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
     await asyncio.gather(*[pc.close() for pc in pcs], return_exceptions=True)
-    get_concert_manager().stop()
 
 
 pcs = set()

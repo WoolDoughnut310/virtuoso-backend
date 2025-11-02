@@ -1,13 +1,25 @@
-from fastapi import APIRouter, UploadFile, Depends
-import os
+from fastapi import FastAPI, APIRouter, UploadFile, Depends
 from uuid import uuid4
 from app.dependencies.media import MediaPathDep
 from app.dependencies.artists import check_artist
-from app.dependencies.concerts import ConcertManagerDep
+from app.concert_manager import ConcertManager
+import os
+from app.dependencies.concerts import set_concert_manager, ConcertManagerDep
+from contextlib import asynccontextmanager
 
-router = APIRouter(dependencies=[Depends(check_artist)], prefix="/concerts")
 
-@router.post("/upload")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    manager = ConcertManager()
+    set_concert_manager(manager)
+    yield
+    manager.stop()
+
+# router = APIRouter(prefix="/concerts", lifespan=lifespan, dependencies=[Depends(check_artist)])
+router = APIRouter(prefix="/concerts", lifespan=lifespan)
+
+# @router.post("/upload")
+@router.post("/upload", dependencies=[Depends(check_artist)])
 async def upload_file(file: UploadFile, media_path: MediaPathDep):
     media_path.mkdir(exist_ok=True)
     filename = f"{uuid4().hex}.bin"
