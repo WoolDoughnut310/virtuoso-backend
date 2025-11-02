@@ -1,6 +1,6 @@
 from io import BytesIO
-from main import app
-from dependencies.users import get_current_user
+from app.main import app
+from app.dependencies.users import get_current_user
 import pytest
 
 @pytest.fixture
@@ -11,7 +11,7 @@ def make_file_upload(client, make_test_user):
 
         data = {"file": (filename, BytesIO(content))}
 
-        return client.post("/upload", files=data)
+        return client.post("/concerts/upload", files=data)
     
     return _make_file_upload
 

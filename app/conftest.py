@@ -1,11 +1,11 @@
 from fastapi.testclient import TestClient
-from main import app
-from database import engine
+from app.main import app
+from app.database import engine
 from sqlmodel import Session
 import pytest
-from models.user import User
+from app.models.user import User
 from pwdlib import PasswordHash
-from dependencies import get_media_path
+from app.dependencies.media import get_media_path
 
 @pytest.fixture
 def client():

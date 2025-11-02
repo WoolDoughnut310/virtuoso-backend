@@ -1,11 +1,11 @@
 from fastapi import APIRouter, UploadFile, Depends
 import os
 from uuid import uuid4
-from dependencies.media import MediaPathDep
-from dependencies.artists import check_artist
-from dependencies.concerts import ConcertManagerDep
+from app.dependencies.media import MediaPathDep
+from app.dependencies.artists import check_artist
+from app.dependencies.concerts import ConcertManagerDep
 
-router = APIRouter(dependencies=[Depends(check_artist)])
+router = APIRouter(dependencies=[Depends(check_artist)], prefix="/concerts")
 
 @router.post("/upload")
 async def upload_file(file: UploadFile, media_path: MediaPathDep):

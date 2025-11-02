@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from dependencies.users import CurrentUserDep
+from app.routers.users import CurrentUserDep
 
 def check_artist(user: CurrentUserDep):
     print("user", user)

@@ -2,7 +2,7 @@ from fastapi import FastAPI, APIRouter, WebSocket
 from aiortc import RTCPeerConnection, RTCSessionDescription
 import asyncio, json
 from aiortc.sdp import candidate_from_sdp
-from dependencies.concerts import get_concert_manager, ConcertManagerDep
+from app.dependencies.concerts import get_concert_manager, ConcertManagerDep
 from contextlib import asynccontextmanager
 
 

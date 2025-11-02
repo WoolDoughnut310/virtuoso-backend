@@ -1,4 +1,4 @@
-from concert_manager import ConcertManager
+from app.concert_manager import ConcertManager
 from typing import Annotated
 from fastapi import Depends
 

@@ -1,8 +1,8 @@
 from fastapi import APIRouter
-from models.user import User, UserPublic, UserCreate
-from dependencies.users import CurrentUserDep
-from dependencies.db import SessionDep
-from routers.authentication import password_hash
+from app.models.user import User, UserPublic, UserCreate
+from app.dependencies.users import CurrentUserDep
+from app.dependencies.db import SessionDep
+from app.routers.authentication import password_hash
 
 router = APIRouter()
 
