@@ -1,8 +1,11 @@
-from fastapi import HTTPException, status
-from app.routers.users import CurrentUserDep
+from fastapi import HTTPException, status, Depends
+from app.dependencies.users import CurrentUserDep
+from typing import Annotated
+from app.models.artist import Artist
 
-def check_artist(user: CurrentUserDep):
-    print("user", user)
-    if not user.is_artist:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-    return True
+def get_current_artist(user: CurrentUserDep):
+    if user.artist == None or user.artist.id == None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not an artist.")
+    return user.artist
+
+CurrentArtistDep = Annotated[Artist, Depends(get_current_artist)]
