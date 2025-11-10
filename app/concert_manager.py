@@ -5,6 +5,10 @@ from app.models.concert import Song
 from fractions import Fraction
 from sqlmodel import Session, select
 import numpy as np
+from datetime import datetime as dt
+from app.dependencies.scheduler import get_scheduler
+from apscheduler.triggers.date import DateTrigger
+from apscheduler.job import Job
 
 class ConcertManager:
     def __init__(self, id: int, db: Session):
@@ -18,6 +22,7 @@ class ConcertManager:
         self.load_track = self._concert_track.load_track
 
         self.load_tracks()
+        self._start_job: Job | None = None
     
     def create_track(self):
         return self._relay.subscribe(self._concert_track)
@@ -28,6 +33,15 @@ class ConcertManager:
     def stop(self):
         self._concert_track.stop()
         self._started = False
+        if self._start_job:
+            self._start_job.remove()
+    
+    def schedule_start(self, when: dt):
+        if self._start_job:
+            self._start_job.reschedule(DateTrigger(run_date=when))
+        else:
+            scheduler = get_scheduler()
+            self._start_job = scheduler.add_job(self.start, DateTrigger(run_date=when), args=[self])
 
 class ConcertTrack(MediaStreamTrack):
     kind = "audio"

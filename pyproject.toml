@@ -11,6 +11,7 @@ dependencies = [
     "annotated-doc==0.0.3",
     "annotated-types==0.7.0",
     "anyio==4.11.0",
+    "apscheduler>=3.11.1",
     "argon2-cffi==25.1.0",
     "argon2-cffi-bindings==25.1.0",
     "av==16.0.1",

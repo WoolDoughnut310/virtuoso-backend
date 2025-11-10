@@ -20,7 +20,6 @@ class ConcertBase(SQLModel):
     max_capacity: int = Field(default=5000)
     ticket_price: float
     description: str = Field(default="")
-    popularity: int = Field(default=0)
 
 class Concert(ConcertBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -29,6 +28,14 @@ class Concert(ConcertBase, table=True):
     artist: "Artist" = Relationship(back_populates="concerts")
 
     songs: List["Song"] = Relationship(back_populates="concert")
+    popularity: int = Field(default=0)
+
+class ConcertUpdate(SQLModel):
+    name: str | None = None
+    start_time: datetime | None = None
+    max_capacity: int | None = None
+    ticket_price: float | None = None
+    description: str | None = None
 
 class ConcertPublic(ConcertBase):
     id: int

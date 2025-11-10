@@ -1,13 +1,15 @@
-from fastapi import APIRouter, UploadFile, HTTPException, Query
-from app.models.concert import ConcertBase, ConcertPublic, Concert, Song, PaginatedConcerts
+from fastapi import APIRouter, UploadFile, HTTPException, Query, FastAPI, BackgroundTasks, status
+from app.models.concert import ConcertBase, ConcertPublic, Concert, Song, PaginatedConcerts, ConcertUpdate
 from app.dependencies.artists import CurrentArtistDep
 from app.dependencies.db import SessionDep
 from app.dependencies.concerts import ArtistConcertDep, ConcertDep
 from app.concert_manager import ConcertManager
-from sqlmodel import select, col, nulls_last
+from sqlmodel import select, col, nulls_last, Session
 from app.dependencies.media import get_media_root
-from typing import List, Literal
+from typing import Literal
 from uuid import uuid4
+from contextlib import asynccontextmanager
+from app.database import engine
 import os
 
 concert_managers: dict[int, ConcertManager] = {}
@@ -17,7 +19,22 @@ def get_concert_manager(concert_id: int, db: SessionDep) -> ConcertManager:
         concert_managers[concert_id] = ConcertManager(concert_id, db)
     return concert_managers[concert_id]
 
-router = APIRouter(prefix="/concerts")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    with Session(engine) as session:
+        concerts = session.exec(select(Concert)).all()
+        
+        for concert in concerts:
+            assert concert.id is not None
+            concert_manager = get_concert_manager(concert.id, session)
+            concert_manager.schedule_start(concert.start_time)
+    yield
+    for concert_manager in concert_managers.values():
+        concert_manager.stop()
+
+
+router = APIRouter(prefix="/concerts", lifespan=lifespan)
 
 @router.post("/upload/{concert_id}")
 async def upload_file(
@@ -78,13 +95,24 @@ async def stop_concert(concert: ArtistConcertDep):
 
 
 @router.post("/create", response_model=ConcertPublic)
-async def create_concert(concert: ConcertBase, session: SessionDep, artist: CurrentArtistDep):
+async def create_concert(concert: ConcertBase, session: SessionDep, artist: CurrentArtistDep, background_tasks: BackgroundTasks):
     assert artist.id is not None
 
     concert_db = Concert(**concert.model_dump(), artist_id=artist.id)
     session.add(concert_db)
     session.commit()
     session.refresh(concert_db)
+    assert concert_db.id is not None
+
+    def schedule_start(concert_id: int):
+        with Session(engine) as s:
+            concert_manager = get_concert_manager(concert_id, s)
+            concert = s.get(Concert, concert_id)
+            if concert:
+                concert_manager.schedule_start(concert.start_time)
+
+    background_tasks.add_task(schedule_start, concert_db.id)
+
     return concert_db
 
 @router.get("/discover", response_model=PaginatedConcerts)
@@ -115,3 +143,30 @@ async def get_concert(concert: ConcertDep, session: SessionDep):
     concert.popularity += 1
     session.commit()
     return concert
+
+@router.patch("/{concert_id}", response_model=ConcertPublic)
+async def update_concert(concert: ArtistConcertDep, data: ConcertUpdate, session: SessionDep):
+    assert concert.id is not None
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(concert, key, value)
+
+    session.add(concert)
+    session.commit()
+    session.refresh(concert)
+
+    if data.start_time:
+        concert_manager = get_concert_manager(concert.id, session)
+        concert_manager.schedule_start(data.start_time)
+
+    return concert
+
+@router.delete("/{concert_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_concert(concert: ArtistConcertDep, session: SessionDep):
+    assert concert.id is not None
+    concert_manager = get_concert_manager(concert.id, session)
+    concert_manager.stop()
+
+    session.delete(concert)
+    session.commit()
+
+    return
