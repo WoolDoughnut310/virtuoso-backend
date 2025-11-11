@@ -3,7 +3,6 @@ from typing import Annotated
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 scheduler = AsyncIOScheduler()
-scheduler.start()
 
 def get_scheduler():
     return scheduler
