@@ -9,6 +9,7 @@ from datetime import datetime as dt
 from app.dependencies.scheduler import get_scheduler
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.job import Job
+from apscheduler.jobstores.base import JobLookupError
 
 class ConcertManager:
     def __init__(self, id: int, db: Session):
@@ -34,14 +35,19 @@ class ConcertManager:
         self._concert_track.stop()
         self._started = False
         if self._start_job:
-            self._start_job.remove()
+            try:
+                self._start_job.remove()
+            except JobLookupError:
+                pass
     
     def schedule_start(self, when: dt):
+        scheduler = get_scheduler()
         if self._start_job:
-            self._start_job.reschedule(DateTrigger(run_date=when))
-        else:
-            scheduler = get_scheduler()
-            self._start_job = scheduler.add_job(self.start, DateTrigger(run_date=when), args=[self])
+            try:
+                self._start_job.remove()
+            except JobLookupError:
+                pass
+        self._start_job = scheduler.add_job(self.start, DateTrigger(run_date=when))
 
 class ConcertTrack(MediaStreamTrack):
     kind = "audio"
