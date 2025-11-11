@@ -65,15 +65,16 @@ def generate_audio_file(duration_sec=5, sample_rate=22050) -> UploadFile:
     return UploadFile(filename=filename, file=audio_bytes)
 
 async def generate_user(password=None):
+    plain_password = password or fake.password()
     user = User(
         username=fake.user_name(),
-        hashed_password=password_hash.hash(fake.password() if not password else password),
+        hashed_password=password_hash.hash(plain_password),
         email=fake.email(),
         full_name=fake.name()
     )
     session.add(user)
     session.commit()
-    return user
+    return user, plain_password
 
 async def generate_artist(user: User):
     artist = Artist(
@@ -104,8 +105,6 @@ async def generate_song(concert: Concert):
     file = generate_audio_file()
     await upload_file(concert, file, session)
 
-
-
 async def generate_demo_data(
     min_users=1, max_users=5,
     min_concerts=1, max_concerts=3,
@@ -115,11 +114,13 @@ async def generate_demo_data(
     num_users = fake.random_int(min=min_users, max=max_users)
 
     for _ in range(num_users):
-        user = await generate_user()
+        user, plain_password = await generate_user()
+        print(f"[USER] {user.username} | {user.email} | password: {plain_password}")
 
         # Decide if this user gets an artist
         if random.random() < artist_probability:
             artist = await generate_artist(user)
+            print(f"  -> ARTIST: {artist.name}")
 
             num_concerts = fake.random_int(min=min_concerts, max=max_concerts)
             for _ in range(num_concerts):
@@ -133,6 +134,6 @@ async def generate_demo_data(
             continue
 
 # Run the async generation
-# if __name__ == "__main__":
-#     import asyncio
-#     asyncio.run(generate_demo_data())
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(generate_demo_data())

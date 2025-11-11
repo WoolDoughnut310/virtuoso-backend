@@ -1,0 +1,5 @@
+[USER] xandrews | danielle30@example.net | password: !$N9R1OH6i
+[USER] ygrimes | david55@example.net | password: !1fkSwN!Zp
+  -> ARTIST: Establish Help
+[USER] roybenton | esampson@example.org | password: +b4^zUJzP%
+  -> ARTIST: Remember Environment
