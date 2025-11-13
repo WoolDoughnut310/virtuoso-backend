@@ -20,6 +20,7 @@ class ConcertBase(SQLModel):
     max_capacity: int = Field(default=5000)
     ticket_price: float
     description: str = Field(default="")
+    cover_image_url: Optional[str] = Field(default=None)
 
 class Concert(ConcertBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -36,6 +37,7 @@ class ConcertUpdate(SQLModel):
     max_capacity: int | None = None
     ticket_price: float | None = None
     description: str | None = None
+    cover_image_url: str | None = None
 
 class ConcertPublic(ConcertBase):
     id: int
