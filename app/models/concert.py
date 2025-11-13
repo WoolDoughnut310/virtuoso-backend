@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 class Song(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
-    file_path: str
+    file_url: str
 
     concert_id: int = Field(foreign_key="concert.id")
     concert: "Concert" = Relationship(back_populates="songs")

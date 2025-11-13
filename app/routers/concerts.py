@@ -56,15 +56,15 @@ async def upload_file(
     # Generate a unique filename with the same extension
     ext = os.path.splitext(filename)[1].lower()
     new_filename = f"{uuid4().hex}{ext}"
-    file_path = os.path.join(media_dir, new_filename)
+    file_url = os.path.join(media_dir, new_filename)
 
     # Save the file
-    with open(file_path, "wb") as out_file:
+    with open(file_url, "wb") as out_file:
         for chunk in iter(lambda: file.file.read(1024 * 1024), b""):
             out_file.write(chunk)
 
     # Create song record
-    song = Song(name=filename, file_path=file_path, concert_id=concert.id)
+    song = Song(name=filename, file_url=file_url, concert_id=concert.id)
     session.add(song)
     session.commit()
 

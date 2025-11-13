@@ -60,7 +60,7 @@ class ConcertTrack(MediaStreamTrack):
         self._track_ptr = -1
         self._track: MediaStreamTrack | None = None
 
-        self._file_paths = {}
+        self._file_urls = {}
 
         self._sample_rate = 48000
         self._channels = 2
@@ -86,11 +86,11 @@ class ConcertTrack(MediaStreamTrack):
         if not song:
             raise Exception("Song not found")
         
-        if song.file_path in self._file_paths:
+        if song.file_url in self._file_urls:
             return
         
-        self._file_paths[song.file_path] = True
-        player = MediaPlayer(song.file_path)
+        self._file_urls[song.file_url] = True
+        player = MediaPlayer(song.file_url)
         if player.audio:
             self._tracks.append(player.audio)
     
