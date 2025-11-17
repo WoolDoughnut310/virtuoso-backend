@@ -20,6 +20,7 @@ class User(UserBase, table=True):
 
 class UserPublic(UserBase):
     id: int
+    artist_id: Optional[int]
 
 class UserCreate(UserBase):
     password: str
