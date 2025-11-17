@@ -1,12 +1,17 @@
 from fastapi import FastAPI
 from app import models
-from app.routers import concerts, ws, users, authentication
+from app.routers import concerts, users, authentication
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.dependencies.scheduler import get_scheduler
+import asyncio
+
+MAIN_LOOP = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global MAIN_LOOP
+    MAIN_LOOP = asyncio.get_running_loop()
     scheduler = get_scheduler()
     scheduler.start()
     yield
@@ -27,7 +32,6 @@ app.add_middleware(
 )
 
 
-app.include_router(ws.router)
 app.include_router(users.router)
 app.include_router(authentication.router)
 app.include_router(concerts.router)

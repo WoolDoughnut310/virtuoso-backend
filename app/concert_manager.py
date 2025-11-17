@@ -1,124 +1,233 @@
+import asyncio
+from aiortc import MediaStreamTrack, RTCPeerConnection
 from aiortc.contrib.media import MediaPlayer, MediaRelay
-from aiortc import MediaStreamTrack, MediaStreamError
-from av import AudioFrame
-from app.models.concert import Song
-from fractions import Fraction
-from sqlmodel import Session, select
-import numpy as np
-from datetime import datetime as dt
-from app.dependencies.scheduler import get_scheduler
+from app.dependencies.db import SessionDep
+from app.models.concert import Song, Concert
+from sqlmodel import select
 from apscheduler.triggers.date import DateTrigger
+from fastapi import WebSocket
+from fastapi.websockets import WebSocketState
+from app.dependencies.scheduler import get_scheduler
 from apscheduler.job import Job
 from apscheduler.jobstores.base import JobLookupError
+from typing import TypedDict, Dict
+from uuid import uuid4
+from aiortc import RTCPeerConnection, RTCSessionDescription
+from aiortc.sdp import candidate_from_sdp
+import subprocess
+import asyncio
+import os, tempfile
+
+
+class Listener(TypedDict):
+    pc: RTCPeerConnection
+    ws: WebSocket
+
+
+def merge_audio_tracks(files: list[str]):
+    temp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+    ffmpeg_cmd = ["ffmpeg"]
+    for f in files:
+        ffmpeg_cmd.extend(["-i", f])
+    ffmpeg_cmd.extend(
+        [
+            "-filter_complex",
+            f"concat=n={len(files)}:v=0:a=1[outa]",
+            "-map",
+            "[outa]",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            "-c:a",
+            "pcm_s16le",
+            temp_file,
+            "-y",
+        ]
+    )
+    subprocess.run(
+        ffmpeg_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
+    )
+    return temp_file
+
 
 class ConcertManager:
-    def __init__(self, id: int, db: Session):
-        self._relay = MediaRelay()
-        self._started = False
+    def __init__(self, id: int, session: SessionDep):
         self.id = id
-        self.db = db
-        self._concert_track = ConcertTrack(self)
-        
-        self.load_tracks = self._concert_track.load_tracks
-        self.load_track = self._concert_track.load_track
-
-        self.load_tracks()
-        self._start_job: Job | None = None
+        self.listeners: Dict[str, Listener] = {}
+        self.session = session
+        self.playlist_track: MediaStreamTrack | None = None
+        self.start_job: Job | None = None
+        self._dummy_task: asyncio.Task | None = None
+        self._temp_file: str | None = None
+        self.relay = MediaRelay()
     
-    def create_track(self):
-        return self._relay.subscribe(self._concert_track)
-    
-    def start(self):
-        self._started = True
-    
-    def stop(self):
-        self._concert_track.stop()
-        self._started = False
-        if self._start_job:
-            try:
-                self._start_job.remove()
-            except JobLookupError:
-                pass
-    
-    def schedule_start(self, when: dt):
-        scheduler = get_scheduler()
-        if self._start_job:
-            try:
-                self._start_job.remove()
-            except JobLookupError:
-                pass
-        self._start_job = scheduler.add_job(self.start, DateTrigger(run_date=when))
-
-class ConcertTrack(MediaStreamTrack):
-    kind = "audio"
-
-    def __init__(self, manager: ConcertManager):
-        super().__init__()
-        self.manager = manager
-
-        self._tracks: list[MediaStreamTrack] = []
-        self._track_ptr = -1
-        self._track: MediaStreamTrack | None = None
-
-        self._file_urls = {}
-
-        self._sample_rate = 48000
-        self._channels = 2
-        self._samples = 960
-        self._pts = 0
-
-    def get_track(self):
-        return self._tracks[self._track_ptr]
-
-    
-    def next_track(self):
-        self._track_ptr += 1
-        if self._track_ptr < len(self._tracks):
-            return self.get_track()
-        else:
-            self.stop()
-            raise MediaStreamError("eof")
-    
-    def load_track(self, song_id: int = -1, song: Song | None = None):
-        if song_id != -1:
-            song = self.manager.db.exec(select(Song).where(Song.id == song_id)).first()
-
-        if not song:
-            raise Exception("Song not found")
-        
-        if song.file_url in self._file_urls:
+    async def _consume_dummy(self):
+        if not self.playlist_track:
             return
-        
-        self._file_urls[song.file_url] = True
-        player = MediaPlayer(song.file_url)
-        if player.audio:
-            self._tracks.append(player.audio)
-    
-    def load_tracks(self):
-        songs = self.manager.db.exec(select(Song).where(Song.id == self.manager.id)).all()
+        dummy_track = self.relay.subscribe(self.playlist_track)
+        while True:
+            try:
+                await dummy_track.recv()
+            except Exception:
+                break  # Track ended
 
-        for song in songs:
-            self.load_track(song=song)
+    def start(self):
+        from app.main import MAIN_LOOP
 
-    def stop(self):
-        for t in self._tracks:
-            t.stop()
-            
-    async def recv(self):
-        if not self.manager._started:
-            print("silencing...")
-            frame = AudioFrame(format="s16", layout="stereo", samples=self._samples)
-            frame.pts = self._pts
-            self._pts += self._samples
-            frame.time_base = Fraction(1, self._sample_rate)
-            silent_data = np.zeros((self._channels, self._samples), dtype=np.int16)
-            frame.planes[0].update(silent_data.tobytes())
-            return frame
-        
+        if MAIN_LOOP is None:
+            raise RuntimeError("Main loop not initialized yet")
+
+        asyncio.run_coroutine_threadsafe(self._start_async(), MAIN_LOOP)
+
+    async def _start_async(self):
+        print("Starting playlist")
+        playlist = list(
+            self.session.exec(
+                select(Song.file_url).where(Song.concert_id == self.id)
+            ).all()
+        )
+
+        self._temp_file = merge_audio_tracks(playlist)
+        self.playlist_track = MediaPlayer(self._temp_file).audio
+
+        if self._dummy_task is None:
+            self._dummy_task = asyncio.create_task(self._consume_dummy())
+
+        for listener_id, listener in list(self.listeners.items()):
+            self.add_track_to_listener(listener_id)
+
+            try:
+                await listener["ws"].send_json({"type": "renegotiate"})
+            except Exception as e:
+                print("Failed to send renegotiate to listener", listener_id, e)
+
+    async def stop(self):
+        if self._dummy_task:
+            self._dummy_task.cancel()
+            try:
+                await self._dummy_task
+            except asyncio.CancelledError:
+                pass
+            self._dummy_task = None
+        if self.playlist_track:
+            self.playlist_track.stop()
+        self.remove_schedule_start()
+        for listener_id in self.listeners.keys():
+            await self.remove_listener(listener_id)
+        if self._temp_file and os.path.exists(self._temp_file):
+            os.remove(self._temp_file)
+
+    def schedule_start(self):
+        start_time = self.session.exec(
+            select(Concert.start_time).where(Concert.id == self.id)
+        ).first()
+        if start_time is None:
+            print("No start time set.")
+            return
+
+        scheduler = get_scheduler()
+        self.remove_schedule_start()
+        self.start_job = scheduler.add_job(self.start, DateTrigger(run_date=start_time))
+
+    def remove_schedule_start(self):
+        if self.start_job is None:
+            return
+
         try:
-            if self._track is None:
-                self._track = self.next_track()
-            return await self._track.recv()
-        except MediaStreamError:
-            self._track = self.next_track()
-            return await self._track.recv()
+            self.start_job.remove()
+        except JobLookupError:
+            pass
+
+    def add_pc_handlers(self, listener_id: str):
+        listener = self.listeners[listener_id]
+        pc = listener["pc"]
+        ws = listener["ws"]
+
+        async def on_state_change():
+            if pc.connectionState in ("failed", "closed", "disconnected"):
+                await self.remove_listener(listener_id)
+
+        async def on_icecandidate(candidate):
+            if candidate is None:
+                return
+            await ws.send_json(
+                {
+                    "type": "candidate",
+                    "candidate": candidate.candidate,
+                    "sdpMid": candidate.sdpMid,
+                    "sdpMLineIndex": candidate.sdpMLineIndex,
+                }
+            )
+
+        pc.on("connectionstatechange", on_state_change)
+        pc.on("icecandidate", on_icecandidate)
+
+    def add_track_to_listener(self, listener_id: str):
+        listener = self.listeners[listener_id]
+
+        try:
+            listener["pc"].addTrack(self.relay.subscribe(self.playlist_track))  # type: ignore
+        except Exception as e:
+            print("Failed to add track to listener", listener_id, e)
+
+    async def add_listener(self, listener: Listener):
+        await listener["ws"].accept()
+
+        listener_id = str(uuid4())
+        self.listeners[listener_id] = listener
+
+        if self.playlist_track:
+            self.add_track_to_listener(listener_id)
+
+        self.add_pc_handlers(listener_id)
+
+        return listener_id
+
+    async def remove_listener(self, listener_id: str):
+        if listener_id not in self.listeners:
+            return
+        listener = self.listeners.pop(listener_id)
+
+        if listener["ws"].application_state == WebSocketState.DISCONNECTED:
+            await listener["ws"].close()
+
+        await listener["pc"].close()
+
+    async def send_reaction(self, emoji: str, from_: str):
+        for listener_id, listener in self.listeners.items():
+            if listener_id == from_:
+                continue
+            await listener["ws"].send_json(
+                {
+                    "type": "emoji",
+                    "emoji": emoji,
+                }
+            )
+
+    async def receive_offer(self, listener_id: str, data):
+        listener = self.listeners[listener_id]
+        pc = listener["pc"]
+        ws = listener["ws"]
+
+        offer = RTCSessionDescription(sdp=data["sdp"], type="offer")
+        await pc.setRemoteDescription(offer)
+        answer = await pc.createAnswer()
+        await pc.setLocalDescription(answer)
+
+        await ws.send_json(
+            {
+                "type": "answer",
+                "sdp": pc.localDescription.sdp,
+            }
+        )
+
+    async def receive_candidate(self, listener_id: str, data):
+        listener = self.listeners[listener_id]
+        pc = listener["pc"]
+
+        cand = data["candidate"]
+        candidate = candidate_from_sdp(cand["candidate"])
+        candidate.sdpMid = cand.get("sdpMid")
+        candidate.sdpMLineIndex = cand.get("sdpMLineIndex")
+        await pc.addIceCandidate(candidate)
