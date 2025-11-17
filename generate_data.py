@@ -3,15 +3,14 @@ from faker import Faker
 from app.models.artist import *
 from app.models.concert import *
 from app.models.user import *
-from app.models.token import *
 from app.routers.authentication import password_hash
-from app.routers.concerts import upload_file
+from app.routers.concerts import upload_song
 from fastapi import UploadFile
-import asyncio
 import random
 import numpy as np
 from synthesizer import Synthesizer, Waveform
 from scipy.io.wavfile import write as write_wav
+from sqlmodel import select
 import io
 
 session = next(get_session())
@@ -103,7 +102,7 @@ async def generate_concert(artist: Artist):
 async def generate_song(concert: Concert):
     assert concert.id is not None
     file = generate_audio_file()
-    await upload_file(concert, file, session)
+    await upload_song(concert, file, session)
 
 async def generate_demo_data(
     min_users=1, max_users=5,
@@ -136,4 +135,13 @@ async def generate_demo_data(
 # Run the async generation
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(generate_demo_data())
+    # asyncio.run(generate_demo_data())
+
+def prop_concert(id: int):
+    import requests
+    response = requests.patch(f"http://localhost:8000/concerts/{id}", json={
+        "start_time": (dt.now() + timedelta(seconds=20)).isoformat()
+    })
+    print(f"OK: {response.ok}")
+    import webbrowser
+    webbrowser.open(f"http://localhost:5173/concert/{id}/live")
