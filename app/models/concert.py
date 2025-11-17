@@ -1,10 +1,16 @@
-from datetime import datetime
+from datetime import datetime as dt, timedelta
 from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
+from pydantic import BaseModel
+
+def three_days_from_now() -> dt:
+    return dt.now() + timedelta(days=3)
 
 if TYPE_CHECKING:
     from app.models.artist import Artist, ArtistPublic
 
+class ImageUploadResponse(BaseModel):
+    cover_image_url: str
 
 class Song(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -15,10 +21,10 @@ class Song(SQLModel, table=True):
     concert: "Concert" = Relationship(back_populates="songs")
 
 class ConcertBase(SQLModel):
-    name: str
-    start_time: datetime
+    name: str = "Default Concert"
+    start_time: dt = Field(default_factory=three_days_from_now)
     max_capacity: int = Field(default=5000)
-    ticket_price: float
+    ticket_price: float = Field(default=0.0)
     description: str = Field(default="")
     cover_image_url: Optional[str] = Field(default=None)
 
@@ -33,7 +39,7 @@ class Concert(ConcertBase, table=True):
 
 class ConcertUpdate(SQLModel):
     name: str | None = None
-    start_time: datetime | None = None
+    start_time: dt | None = None
     max_capacity: int | None = None
     ticket_price: float | None = None
     description: str | None = None
