@@ -12,9 +12,11 @@ from fastapi import (
 from app.models.concert import (
     ConcertPublic,
     Concert,
-    Song,
     PaginatedConcerts,
     ConcertUpdate,
+    ConcertSetlistItemPublic,
+    ConcertSetlistItem,
+    ConcertSetlistItemCreate,
 )
 from app.dependencies.artists import CurrentArtistDep
 from app.dependencies.db import SessionDep
@@ -24,27 +26,16 @@ from app.dependencies.concerts import (
     ConcertManagerDep,
     ArtistConcertManagerDep,
 )
+from app.models.artist import MediaAsset
 from aiortc import RTCPeerConnection
 from app.concert_manager import Listener
 from sqlmodel import select, col, nulls_last, Session
-from app.dependencies.media import get_media_root, audio_content_types
 from app.models.concert import ImageUploadResponse
 from app.dependencies.concerts import get_concert_manager, concert_managers
 from typing import Literal, Optional
-from uuid import uuid4
 from contextlib import asynccontextmanager
 from app.database import engine
-import os
-from app.config import settings
-from cloudinary.uploader import upload_image
-import cloudinary
-
-cloudinary.config(
-    cloud_name=settings.cloudinary_cloud_name,
-    api_key=settings.cloudinary_api_key,
-    api_secret=settings.cloudinary_api_secret,
-    secure=True,
-)
+from app.storage import upload_image, image_content_types
 
 
 @asynccontextmanager
@@ -67,7 +58,7 @@ router = APIRouter(prefix="/concerts", lifespan=lifespan)
 async def upload_concert_image(concert: ConcertDep, file: UploadFile):
     assert concert.id is not None
 
-    if file.content_type not in ["image/jpeg", "image/png", "image/webp"]:
+    if file.content_type not in image_content_types:
         raise HTTPException(status_code=400, detail="Invalid image format.")
 
     file_bytes = await file.read()
@@ -75,44 +66,6 @@ async def upload_concert_image(concert: ConcertDep, file: UploadFile):
     image_result = upload_image(file_bytes)
 
     return {"cover_image_url": image_result.url}
-
-
-@router.post("/upload-song/{concert_id}")
-async def upload_song(
-    concert: ArtistConcertDep,
-    file: UploadFile,
-    session: SessionDep,
-):
-    assert concert.id is not None
-
-    filename = file.filename
-    if not filename:
-        raise HTTPException(status_code=400, detail="No filename")
-
-    if file.content_type not in audio_content_types:
-        raise HTTPException(status_code=400, detail="Invalid audio format.")
-
-    # Create a folder for this concert using its ID
-    media_root = get_media_root()
-    media_dir = os.path.join(media_root, str(concert.id))
-    os.makedirs(media_dir, exist_ok=True)
-
-    # Generate a unique filename with the same extension
-    ext = os.path.splitext(filename)[1].lower()
-    new_filename = f"{uuid4().hex}{ext}"
-    file_url = os.path.join(media_dir, new_filename)
-
-    # Save the file
-    with open(file_url, "wb") as out_file:
-        for chunk in iter(lambda: file.file.read(1024 * 1024), b""):
-            out_file.write(chunk)
-
-    # Create song record
-    song = Song(name=filename, file_url=file_url, concert_id=concert.id)
-    session.add(song)
-    session.commit()
-
-    return {"filename": new_filename, "ok": True}
 
 
 @router.post("/create", response_model=ConcertPublic)
@@ -194,10 +147,10 @@ async def get_concert(concert: ConcertDep, session: SessionDep):
 
 @router.patch("/{concert_id}", response_model=ConcertPublic)
 async def update_concert(
-    concert: ConcertDep,
+    concert: ArtistConcertDep,
     data: ConcertUpdate,
     session: SessionDep,
-    concert_manager: ConcertManagerDep, # change back to artist's
+    concert_manager: ArtistConcertManagerDep,
 ):
     assert concert.id is not None
     for key, value in data.model_dump(exclude_unset=True).items():
@@ -221,6 +174,47 @@ async def delete_concert(
 ):
     await concert_manager.stop()
     session.delete(concert)
+    session.commit()
+    return
+
+
+@router.post("/{concert_id}/setlist", response_model=ConcertSetlistItemPublic)
+async def create_setlist_item(
+    item_data: ConcertSetlistItemCreate,
+    artist: CurrentArtistDep,
+    concert: ArtistConcertDep,
+    session: SessionDep,
+):
+    item_db = ConcertSetlistItem.model_validate(
+        item_data, update={"concert_id": concert.id}
+    )
+
+    # Check if artist owns the asset referenced in the request
+    session.exec(
+        select(MediaAsset)
+        .where(MediaAsset.artist_id == artist.id)
+        .where(MediaAsset.id == item_db.asset_id)
+    )
+
+    session.add(item_db)
+    session.commit()
+    session.refresh(item_db)
+
+    return item_db
+
+
+@router.delete(
+    "/{concert_id}/setlist/{item_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_setlist_item(
+    concert: ArtistConcertDep, item_id: int, session: SessionDep
+):
+    setlist_item = session.exec(
+        select(ConcertSetlistItem)
+        .where(ConcertSetlistItem.id == item_id)
+        .where(ConcertSetlistItem.concert_id == concert.id)
+    )
+    session.delete(setlist_item)
     session.commit()
     return
 

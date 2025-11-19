@@ -2,8 +2,9 @@ import asyncio
 from aiortc import MediaStreamTrack, RTCPeerConnection
 from aiortc.contrib.media import MediaPlayer, MediaRelay
 from app.dependencies.db import SessionDep
-from app.models.concert import Song, Concert
-from sqlmodel import select
+from app.models.concert import ConcertSetlistItem, Concert
+from app.models.artist import MediaAsset
+from sqlmodel import select, col
 from apscheduler.triggers.date import DateTrigger
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
@@ -61,7 +62,7 @@ class ConcertManager:
         self._dummy_task: asyncio.Task | None = None
         self._temp_file: str | None = None
         self.relay = MediaRelay()
-    
+
     async def _consume_dummy(self):
         if not self.playlist_track:
             return
@@ -82,13 +83,14 @@ class ConcertManager:
 
     async def _start_async(self):
         print("Starting playlist")
-        playlist = list(
-            self.session.exec(
-                select(Song.file_url).where(Song.concert_id == self.id)
-            ).all()
-        )
+        playlist = self.session.exec(
+            select(MediaAsset.url)
+            .join(ConcertSetlistItem)
+            .where(ConcertSetlistItem.concert_id == self.id)
+            .order_by(col(ConcertSetlistItem.track_number))
+        ).all()
 
-        self._temp_file = merge_audio_tracks(playlist)
+        self._temp_file = merge_audio_tracks(list(playlist))
         self.playlist_track = MediaPlayer(self._temp_file).audio
 
         if self._dummy_task is None:

@@ -4,7 +4,7 @@ from app.models.artist import *
 from app.models.concert import *
 from app.models.user import *
 from app.routers.authentication import password_hash
-from app.routers.concerts import upload_song
+from app.routers.artists import upload_media
 from fastapi import UploadFile
 import random
 import numpy as np
@@ -99,10 +99,24 @@ async def generate_concert(artist: Artist):
     session.commit()
     return concert
 
-async def generate_song(concert: Concert):
-    assert concert.id is not None
+async def generate_asset(artist: Artist):
     file = generate_audio_file()
-    await upload_song(concert, file, session)
+    asset = await upload_media(file, session, artist)
+    return asset
+
+async def generate_song(asset: MediaAsset, concert: Concert, existing_tracks: int):
+    assert concert.id is not None
+    assert asset.id is not None
+
+    setlist_item = ConcertSetlistItem(
+        name=" ".join(fake.words()),
+        concert_id=concert.id,
+        asset_id=asset.id,
+        track_number=existing_tracks + 1
+    )
+    session.add(setlist_item)
+    session.commit()
+    return setlist_item
 
 async def generate_demo_data(
     min_users=1, max_users=5,
@@ -126,8 +140,9 @@ async def generate_demo_data(
                 concert = await generate_concert(artist)
 
                 num_songs = fake.random_int(min=min_songs, max=max_songs)
-                for _ in range(num_songs):
-                    await generate_song(concert)
+                for existing_tracks in range(num_songs):
+                    asset = await generate_asset(artist)
+                    await generate_song(asset, concert, existing_tracks)
         else:
             # User exists without an artist
             continue
